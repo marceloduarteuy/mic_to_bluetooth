@@ -7,12 +7,16 @@ class MicButton extends StatefulWidget {
   final MicState micState;
   final bool isEnabled;
   final VoidCallback onPressed;
+  final VoidCallback? onLongPressStart;
+  final VoidCallback? onLongPressEnd;
 
   const MicButton({
     super.key,
     required this.micState,
     required this.isEnabled,
     required this.onPressed,
+    this.onLongPressStart,
+    this.onLongPressEnd,
   });
 
   @override
@@ -23,6 +27,7 @@ class _MicButtonState extends State<MicButton>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _pulseAnimation;
+  bool _isLongPressing = false;
 
   @override
   void initState() {
@@ -51,6 +56,26 @@ class _MicButtonState extends State<MicButton>
   void dispose() {
     _animationController.dispose();
     super.dispose();
+  }
+
+  void _handleLongPressStart(LongPressStartDetails details) {
+    if (!widget.isEnabled) return;
+
+    setState(() {
+      _isLongPressing = true;
+    });
+    HapticFeedback.heavyImpact();
+    widget.onLongPressStart?.call();
+  }
+
+  void _handleLongPressEnd(LongPressEndDetails details) {
+    if (!_isLongPressing) return;
+
+    setState(() {
+      _isLongPressing = false;
+    });
+    HapticFeedback.lightImpact();
+    widget.onLongPressEnd?.call();
   }
 
   @override
@@ -107,25 +132,35 @@ class _MicButtonState extends State<MicButton>
             ),
             child: Material(
               color: Colors.transparent,
-              child: InkWell(
+              child: GestureDetector(
                 onTap: widget.isEnabled && !isLoading
                     ? () {
                         HapticFeedback.mediumImpact();
                         widget.onPressed();
                       }
                     : null,
-                customBorder: const CircleBorder(),
-                child: Center(
-                  child: isLoading
-                      ? const CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 3,
-                        )
-                      : Icon(
-                          isActive ? Icons.mic : Icons.mic_none,
-                          size: 48,
-                          color: Colors.white,
-                        ),
+                onLongPressStart: widget.isEnabled && !isLoading && widget.onLongPressStart != null
+                    ? _handleLongPressStart
+                    : null,
+                onLongPressEnd: widget.onLongPressEnd != null
+                    ? _handleLongPressEnd
+                    : null,
+                child: Container(
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: isLoading
+                        ? const CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 3,
+                          )
+                        : Icon(
+                            isActive ? Icons.mic : Icons.mic_none,
+                            size: 48,
+                            color: Colors.white,
+                          ),
+                  ),
                 ),
               ),
             ),
@@ -138,6 +173,7 @@ class _MicButtonState extends State<MicButton>
             color: isActive ? Colors.red : null,
             fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
           ),
+          textAlign: TextAlign.center,
         ),
       ],
     );
@@ -146,11 +182,11 @@ class _MicButtonState extends State<MicButton>
   String _getStatusText() {
     switch (widget.micState) {
       case MicState.idle:
-        return widget.isEnabled ? 'Tap to speak' : 'Connect a device first';
+        return widget.isEnabled ? 'Tap to toggle\nHold to talk' : 'Connect a device first';
       case MicState.starting:
         return 'Starting...';
       case MicState.active:
-        return 'LIVE - Tap to stop';
+        return _isLongPressing ? 'LIVE - Release to stop' : 'LIVE - Tap to stop';
       case MicState.stopping:
         return 'Stopping...';
       case MicState.error:

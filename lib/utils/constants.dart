@@ -9,6 +9,7 @@ class AppConstants {
 
   // Default volumes (0.0 to 1.0)
   static const double defaultMicVolume = 0.8;
+  static const double defaultMusicDuckingVolume = 0.9; // 90% - music level when mic is active
   static const double minVolume = 0.0;
   static const double maxVolume = 1.0;
 

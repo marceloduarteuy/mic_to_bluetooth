@@ -26,3 +26,5 @@ ios/Runner/GeneratedPluginRegistrant.*
 # Misc
 .DS_Store
 *.log
+
+release/

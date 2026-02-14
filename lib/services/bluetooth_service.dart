@@ -14,6 +14,7 @@ class BluetoothService extends ChangeNotifier {
   // State
   BtConnectionState _connectionState = BtConnectionState.disconnected;
   fbp.BluetoothDevice? _connectedDevice;
+  fbp.DeviceIdentifier? _connectingDeviceId; // Track which device is connecting
   List<fbp.ScanResult> _scanResults = [];
   String? _errorMessage;
   bool _isBluetoothOn = false;
@@ -26,10 +27,17 @@ class BluetoothService extends ChangeNotifier {
   // Getters
   BtConnectionState get connectionState => _connectionState;
   fbp.BluetoothDevice? get connectedDevice => _connectedDevice;
+  fbp.DeviceIdentifier? get connectingDeviceId => _connectingDeviceId;
   List<fbp.ScanResult> get scanResults => _scanResults;
   String? get errorMessage => _errorMessage;
   bool get isBluetoothOn => _isBluetoothOn;
   bool get isConnected => _connectionState == BtConnectionState.connected;
+
+  /// Check if a specific device is currently connecting
+  bool isDeviceConnecting(fbp.DeviceIdentifier deviceId) {
+    return _connectionState == BtConnectionState.connecting &&
+           _connectingDeviceId == deviceId;
+  }
 
   BluetoothService() {
     _init();
@@ -119,6 +127,7 @@ class BluetoothService extends ChangeNotifier {
   Future<bool> connectToDevice(fbp.BluetoothDevice device) async {
     _errorMessage = null;
     _connectionState = BtConnectionState.connecting;
+    _connectingDeviceId = device.remoteId; // Track which device is connecting
     notifyListeners();
 
     try {
@@ -133,6 +142,7 @@ class BluetoothService extends ChangeNotifier {
 
       _connectedDevice = device;
       _connectionState = BtConnectionState.connected;
+      _connectingDeviceId = null;
 
       // Listen to connection state changes
       _deviceStateSubscription?.cancel();
@@ -149,6 +159,7 @@ class BluetoothService extends ChangeNotifier {
     } catch (e) {
       _errorMessage = 'Connection failed: ${e.toString()}';
       _connectionState = BtConnectionState.disconnected;
+      _connectingDeviceId = null;
       _connectedDevice = null;
       notifyListeners();
       return false;

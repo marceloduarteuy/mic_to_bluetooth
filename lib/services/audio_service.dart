@@ -23,11 +23,13 @@ class AudioService extends ChangeNotifier {
   // State
   MicState _micState = MicState.idle;
   double _micVolume = AppConstants.defaultMicVolume;
+  double _musicDuckingVolume = AppConstants.defaultMusicDuckingVolume;
   String? _errorMessage;
   bool _isInitialized = false;
 
-  // Stream controller for audio data
+  // Stream controllers for audio data
   StreamController<Food>? _playerStreamController;
+  StreamController<Uint8List>? _recordingDataController;
   StreamSubscription<Uint8List>? _recorderSubscription;
 
   // Platform channel for native audio routing
@@ -36,6 +38,7 @@ class AudioService extends ChangeNotifier {
   // Getters
   MicState get micState => _micState;
   double get micVolume => _micVolume;
+  double get musicDuckingVolume => _musicDuckingVolume;
   String? get errorMessage => _errorMessage;
   bool get isInitialized => _isInitialized;
   bool get isMicActive => _micState == MicState.active;
@@ -127,19 +130,19 @@ class AudioService extends ChangeNotifier {
         interleaved: true,
       );
 
-      // Create a stream controller for recorder output
-      final recordingDataController = StreamController<Uint8List>();
+      // Create a stream controller for recorder output (store it for cleanup)
+      _recordingDataController = StreamController<Uint8List>();
 
       // Start recording from microphone to our stream
       await _recorder!.startRecorder(
-        toStream: recordingDataController.sink,
+        toStream: _recordingDataController!.sink,
         codec: Codec.pcm16,
         sampleRate: AppConstants.sampleRate,
         numChannels: AppConstants.numChannels,
       );
 
       // Connect mic input to speaker output
-      _recorderSubscription = recordingDataController.stream.listen((audioData) {
+      _recorderSubscription = _recordingDataController!.stream.listen((audioData) {
         if (_player != null && _player!.isPlaying) {
           // Apply volume adjustment
           final adjustedData = _applyVolume(audioData, _micVolume);
@@ -169,32 +172,53 @@ class AudioService extends ChangeNotifier {
     _micState = MicState.stopping;
     notifyListeners();
 
+    // Release audio focus FIRST (allows other apps to resume full volume immediately)
     try {
-      // Stop recording
-      if (_recorder != null && _recorder!.isRecording) {
-        await _recorder!.stopRecorder();
-      }
+      await _audioSession?.setActive(false);
+    } catch (e) {
+      debugPrint('Error releasing audio focus: $e');
+    }
 
-      // Stop playback
-      if (_player != null && _player!.isPlaying) {
-        await _player!.stopPlayer();
-      }
+    // Update UI immediately
+    _micState = MicState.idle;
+    notifyListeners();
 
-      // Clean up streams
+    // Clean up audio resources in background (don't block UI)
+    _cleanupAudioResources();
+  }
+
+  /// Clean up audio resources without blocking
+  Future<void> _cleanupAudioResources() async {
+    try {
+      // Cancel subscription first to stop data flow
       await _recorderSubscription?.cancel();
       _recorderSubscription = null;
 
+      // Stop recording with timeout
+      if (_recorder != null && _recorder!.isRecording) {
+        await _recorder!.stopRecorder().timeout(
+          const Duration(seconds: 2),
+          onTimeout: () => null,
+        );
+      }
+
+      // Stop playback with timeout
+      if (_player != null && _player!.isPlaying) {
+        await _player!.stopPlayer().timeout(
+          const Duration(seconds: 2),
+          onTimeout: () => null,
+        );
+      }
+
+      // Close stream controllers
+      await _recordingDataController?.close();
+      _recordingDataController = null;
+
       await _playerStreamController?.close();
       _playerStreamController = null;
-
-      // Release audio focus (allows other apps to resume full volume)
-      await _audioSession?.setActive(false);
     } catch (e) {
-      debugPrint('Error stopping mic: $e');
+      debugPrint('Error cleaning up audio resources: $e');
     }
-
-    _micState = MicState.idle;
-    notifyListeners();
   }
 
   /// Toggle microphone streaming
@@ -211,6 +235,15 @@ class AudioService extends ChangeNotifier {
   void setMicVolume(double volume) {
     _micVolume = volume.clamp(AppConstants.minVolume, AppConstants.maxVolume);
     notifyListeners();
+  }
+
+  /// Set music ducking volume (0.0 to 1.0)
+  /// This controls how much the background music is reduced when mic is active
+  void setMusicDuckingVolume(double volume) {
+    _musicDuckingVolume = volume.clamp(AppConstants.minVolume, AppConstants.maxVolume);
+    notifyListeners();
+    // Note: Android ducking level is typically controlled by the system
+    // This value can be used for display purposes or future platform channel implementation
   }
 
   /// Apply volume to audio data

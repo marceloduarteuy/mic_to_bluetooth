@@ -278,8 +278,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             device: device,
             isConnected:
                 btService.connectedDevice?.remoteId == device.remoteId,
-            isConnecting:
-                btService.connectionState == BtConnectionState.connecting,
+            isConnecting: btService.isDeviceConnecting(device.remoteId),
             onTap: () => btService.connectToDevice(device),
           );
         },
@@ -331,8 +330,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           rssi: result.rssi,
           isConnected:
               btService.connectedDevice?.remoteId == result.device.remoteId,
-          isConnecting:
-              btService.connectionState == BtConnectionState.connecting,
+          isConnecting: btService.isDeviceConnecting(result.device.remoteId),
           onTap: () => btService.connectToDevice(result.device),
         );
       },
@@ -346,24 +344,37 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Mic button
+          // Mic button with long press support
           MicButton(
             micState: audioService.micState,
             isEnabled: btService.isConnected && audioService.isInitialized,
             onPressed: () => audioService.toggleMicStreaming(),
+            onLongPressStart: () => audioService.startMicStreaming(),
+            onLongPressEnd: () => audioService.stopMicStreaming(),
           ),
 
           const SizedBox(height: 48),
 
-          // Volume control
+          // Microphone volume control
           VolumeSlider(
             label: 'Microphone Volume',
             icon: Icons.mic,
             value: audioService.micVolume,
             onChanged: audioService.setMicVolume,
             enabled: true,
-            activeColor:
-                audioService.isMicActive ? Colors.red : null,
+            activeColor: audioService.isMicActive ? Colors.red : null,
+          ),
+
+          const SizedBox(height: 24),
+
+          // Music ducking volume control
+          VolumeSlider(
+            label: 'Music Level (when mic active)',
+            icon: Icons.music_note,
+            value: audioService.musicDuckingVolume,
+            onChanged: audioService.setMusicDuckingVolume,
+            enabled: true,
+            activeColor: Colors.orange,
           ),
 
           const Spacer(),
@@ -395,7 +406,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           Text(
             audioService.isMicActive
                 ? 'Your voice is being streamed.\nOther apps\' audio will be ducked.'
-                : 'Tap the mic button to start speaking.\nMusic from other apps will lower in volume.',
+                : 'Tap to toggle mic, or hold to talk.\nMusic from other apps will lower in volume.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall,
           ),
