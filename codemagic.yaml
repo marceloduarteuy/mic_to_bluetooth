@@ -9,8 +9,18 @@ workflows:
       java: 17
 
     scripts:
+      - name: Set up environment
+        script: |
+          flutter --version
+          java --version
+
       - name: Get Flutter packages
         script: |
+          flutter pub get
+
+      - name: Clean build
+        script: |
+          flutter clean
           flutter pub get
 
       - name: Build APK (debug)
