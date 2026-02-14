@@ -67,11 +67,16 @@ class AudioService extends ChangeNotifier {
   }
 
   Future<void> _configureAudioSession() async {
+    // Combine options using their integer values
+    final combinedOptions = AVAudioSessionCategoryOptions(
+      AVAudioSessionCategoryOptions.allowBluetooth.value |
+      AVAudioSessionCategoryOptions.defaultToSpeaker.value |
+      AVAudioSessionCategoryOptions.duckOthers.value,
+    );
+
     await _audioSession?.configure(AudioSessionConfiguration(
       avAudioSessionCategory: AVAudioSessionCategory.playAndRecord,
-      avAudioSessionCategoryOptions: AVAudioSessionCategoryOptions.allowBluetooth
-          .union(AVAudioSessionCategoryOptions.defaultToSpeaker)
-          .union(AVAudioSessionCategoryOptions.duckOthers),
+      avAudioSessionCategoryOptions: combinedOptions,
       avAudioSessionMode: AVAudioSessionMode.voiceChat,
       avAudioSessionRouteSharingPolicy:
           AVAudioSessionRouteSharingPolicy.defaultPolicy,
