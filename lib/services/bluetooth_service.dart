@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart' as fbp;
 import '../utils/constants.dart';
 
-enum BluetoothConnectionState {
+enum BtConnectionState {
   disconnected,
   scanning,
   connecting,
@@ -12,26 +12,24 @@ enum BluetoothConnectionState {
 
 class BluetoothService extends ChangeNotifier {
   // State
-  BluetoothConnectionState _connectionState =
-      BluetoothConnectionState.disconnected;
-  BluetoothDevice? _connectedDevice;
-  List<ScanResult> _scanResults = [];
+  BtConnectionState _connectionState = BtConnectionState.disconnected;
+  fbp.BluetoothDevice? _connectedDevice;
+  List<fbp.ScanResult> _scanResults = [];
   String? _errorMessage;
   bool _isBluetoothOn = false;
 
   // Subscriptions
-  StreamSubscription<List<ScanResult>>? _scanSubscription;
-  StreamSubscription<BluetoothConnectionState>? _deviceStateSubscription;
-  StreamSubscription<BluetoothAdapterState>? _adapterStateSubscription;
+  StreamSubscription<List<fbp.ScanResult>>? _scanSubscription;
+  StreamSubscription<fbp.BluetoothConnectionState>? _deviceStateSubscription;
+  StreamSubscription<fbp.BluetoothAdapterState>? _adapterStateSubscription;
 
   // Getters
-  BluetoothConnectionState get connectionState => _connectionState;
-  BluetoothDevice? get connectedDevice => _connectedDevice;
-  List<ScanResult> get scanResults => _scanResults;
+  BtConnectionState get connectionState => _connectionState;
+  fbp.BluetoothDevice? get connectedDevice => _connectedDevice;
+  List<fbp.ScanResult> get scanResults => _scanResults;
   String? get errorMessage => _errorMessage;
   bool get isBluetoothOn => _isBluetoothOn;
-  bool get isConnected =>
-      _connectionState == BluetoothConnectionState.connected;
+  bool get isConnected => _connectionState == BtConnectionState.connected;
 
   BluetoothService() {
     _init();
@@ -40,10 +38,10 @@ class BluetoothService extends ChangeNotifier {
   void _init() {
     // Listen to Bluetooth adapter state
     _adapterStateSubscription =
-        FlutterBluePlus.adapterState.listen((state) {
-      _isBluetoothOn = state == BluetoothAdapterState.on;
+        fbp.FlutterBluePlus.adapterState.listen((state) {
+      _isBluetoothOn = state == fbp.BluetoothAdapterState.on;
       if (!_isBluetoothOn) {
-        _connectionState = BluetoothConnectionState.disconnected;
+        _connectionState = BtConnectionState.disconnected;
         _connectedDevice = null;
         _scanResults = [];
       }
@@ -60,7 +58,7 @@ class BluetoothService extends ChangeNotifier {
     }
 
     _errorMessage = null;
-    _connectionState = BluetoothConnectionState.scanning;
+    _connectionState = BtConnectionState.scanning;
     _scanResults = [];
     notifyListeners();
 
@@ -68,7 +66,7 @@ class BluetoothService extends ChangeNotifier {
     await _scanSubscription?.cancel();
 
     // Start scanning
-    _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
+    _scanSubscription = fbp.FlutterBluePlus.scanResults.listen((results) {
       // Filter to show only audio devices (speakers, headphones)
       // We check for audio-related service UUIDs or device names
       _scanResults = results.where((r) {
@@ -84,13 +82,13 @@ class BluetoothService extends ChangeNotifier {
     });
 
     try {
-      await FlutterBluePlus.startScan(
+      await fbp.FlutterBluePlus.startScan(
         timeout: AppConstants.scanDuration,
         androidUsesFineLocation: false,
       );
     } catch (e) {
       _errorMessage = 'Scan failed: ${e.toString()}';
-      _connectionState = BluetoothConnectionState.disconnected;
+      _connectionState = BtConnectionState.disconnected;
       notifyListeners();
       return;
     }
@@ -98,29 +96,29 @@ class BluetoothService extends ChangeNotifier {
     // When scan completes
     await Future.delayed(AppConstants.scanDuration);
     _connectionState = _connectedDevice != null
-        ? BluetoothConnectionState.connected
-        : BluetoothConnectionState.disconnected;
+        ? BtConnectionState.connected
+        : BtConnectionState.disconnected;
     notifyListeners();
   }
 
   /// Stop scanning
   Future<void> stopScan() async {
-    await FlutterBluePlus.stopScan();
+    await fbp.FlutterBluePlus.stopScan();
     await _scanSubscription?.cancel();
     _scanSubscription = null;
 
-    if (_connectionState == BluetoothConnectionState.scanning) {
+    if (_connectionState == BtConnectionState.scanning) {
       _connectionState = _connectedDevice != null
-          ? BluetoothConnectionState.connected
-          : BluetoothConnectionState.disconnected;
+          ? BtConnectionState.connected
+          : BtConnectionState.disconnected;
       notifyListeners();
     }
   }
 
   /// Connect to a Bluetooth device
-  Future<bool> connectToDevice(BluetoothDevice device) async {
+  Future<bool> connectToDevice(fbp.BluetoothDevice device) async {
     _errorMessage = null;
-    _connectionState = BluetoothConnectionState.connecting;
+    _connectionState = BtConnectionState.connecting;
     notifyListeners();
 
     try {
@@ -134,14 +132,14 @@ class BluetoothService extends ChangeNotifier {
       );
 
       _connectedDevice = device;
-      _connectionState = BluetoothConnectionState.connected;
+      _connectionState = BtConnectionState.connected;
 
       // Listen to connection state changes
       _deviceStateSubscription?.cancel();
       _deviceStateSubscription = device.connectionState.listen((state) {
-        if (state == BluetoothConnectionState.disconnected) {
+        if (state == fbp.BluetoothConnectionState.disconnected) {
           _connectedDevice = null;
-          _connectionState = BluetoothConnectionState.disconnected;
+          _connectionState = BtConnectionState.disconnected;
           notifyListeners();
         }
       });
@@ -150,7 +148,7 @@ class BluetoothService extends ChangeNotifier {
       return true;
     } catch (e) {
       _errorMessage = 'Connection failed: ${e.toString()}';
-      _connectionState = BluetoothConnectionState.disconnected;
+      _connectionState = BtConnectionState.disconnected;
       _connectedDevice = null;
       notifyListeners();
       return false;
@@ -165,14 +163,14 @@ class BluetoothService extends ChangeNotifier {
       debugPrint('Disconnect error: $e');
     }
     _connectedDevice = null;
-    _connectionState = BluetoothConnectionState.disconnected;
+    _connectionState = BtConnectionState.disconnected;
     notifyListeners();
   }
 
   /// Get list of bonded (paired) devices
-  Future<List<BluetoothDevice>> getBondedDevices() async {
+  Future<List<fbp.BluetoothDevice>> getBondedDevices() async {
     try {
-      return await FlutterBluePlus.bondedDevices;
+      return await fbp.FlutterBluePlus.bondedDevices;
     } catch (e) {
       _errorMessage = 'Failed to get paired devices: ${e.toString()}';
       notifyListeners();

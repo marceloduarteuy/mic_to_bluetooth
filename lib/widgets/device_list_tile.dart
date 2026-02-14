@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart' as fbp;
 
 class DeviceListTile extends StatelessWidget {
-  final BluetoothDevice device;
+  final fbp.BluetoothDevice device;
   final int? rssi;
   final bool isConnected;
   final bool isConnecting;

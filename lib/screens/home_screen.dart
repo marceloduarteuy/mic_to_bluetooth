@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart' as fbp;
 import 'package:provider/provider.dart';
 import '../services/bluetooth_service.dart';
 import '../services/audio_service.dart';
@@ -18,7 +18,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _permissionsGranted = false;
   bool _showingPairedDevices = true;
-  List<BluetoothDevice> _pairedDevices = [];
+  List<fbp.BluetoothDevice> _pairedDevices = [];
 
   @override
   void initState() {
@@ -279,7 +279,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             isConnected:
                 btService.connectedDevice?.remoteId == device.remoteId,
             isConnecting:
-                btService.connectionState == BluetoothConnectionState.connecting,
+                btService.connectionState == BtConnectionState.connecting,
             onTap: () => btService.connectToDevice(device),
           );
         },
@@ -288,7 +288,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildScannedDeviceList(BluetoothService btService) {
-    if (btService.connectionState == BluetoothConnectionState.scanning) {
+    if (btService.connectionState == BtConnectionState.scanning) {
       if (btService.scanResults.isEmpty) {
         return const Center(
           child: Column(
@@ -332,7 +332,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           isConnected:
               btService.connectedDevice?.remoteId == result.device.remoteId,
           isConnecting:
-              btService.connectionState == BluetoothConnectionState.connecting,
+              btService.connectionState == BtConnectionState.connecting,
           onTap: () => btService.connectToDevice(result.device),
         );
       },
