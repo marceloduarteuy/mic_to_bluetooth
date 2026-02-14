@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:audio_session/audio_session.dart';
@@ -26,8 +27,8 @@ class AudioService extends ChangeNotifier {
   bool _isInitialized = false;
 
   // Stream controller for audio data
-  StreamController<Uint8List>? _audioStreamController;
-  StreamSubscription? _audioStreamSubscription;
+  StreamController<Food>? _playerStreamController;
+  StreamSubscription<Uint8List>? _recorderSubscription;
 
   // Platform channel for native audio routing
   static const _audioChannel = MethodChannel('com.example.mic_to_bluetooth/audio');
@@ -70,7 +71,6 @@ class AudioService extends ChangeNotifier {
       avAudioSessionCategory: AVAudioSessionCategory.playAndRecord,
       avAudioSessionCategoryOptions:
           AVAudioSessionCategoryOptions.allowBluetooth |
-              AVAudioSessionCategoryOptions.allowBluetoothA2DP |
               AVAudioSessionCategoryOptions.defaultToSpeaker |
               AVAudioSessionCategoryOptions.duckOthers,
       avAudioSessionMode: AVAudioSessionMode.voiceChat,
@@ -111,30 +111,36 @@ class AudioService extends ChangeNotifier {
       // Route audio to Bluetooth if available
       await _routeAudioToBluetooth();
 
-      // Create stream for audio data
-      _audioStreamController = StreamController<Uint8List>();
+      // Create stream controller for player
+      _playerStreamController = StreamController<Food>();
 
-      // Start recording from microphone
-      await _recorder!.startRecorder(
-        toStream: _audioStreamController!.sink,
+      // Start playback from stream first
+      await _player!.startPlayerFromStream(
         codec: Codec.pcm16,
         sampleRate: AppConstants.sampleRate,
         numChannels: AppConstants.numChannels,
+        bufferSize: 8192,
       );
 
-      // Start playback of mic audio (loopback to speaker/Bluetooth)
-      await _player!.startPlayerFromStream(
+      // Create a stream controller for recorder output
+      final recordingDataController = StreamController<Uint8List>();
+
+      // Start recording from microphone to our stream
+      await _recorder!.startRecorder(
+        toStream: recordingDataController.sink,
         codec: Codec.pcm16,
         sampleRate: AppConstants.sampleRate,
         numChannels: AppConstants.numChannels,
       );
 
       // Connect mic input to speaker output
-      _audioStreamSubscription =
-          _audioStreamController!.stream.listen((audioData) {
-        // Apply volume adjustment
-        final adjustedData = _applyVolume(audioData, _micVolume);
-        _player!.foodSink?.add(FoodData(adjustedData));
+      _recorderSubscription = recordingDataController.stream.listen((audioData) {
+        if (_player != null && _player!.isPlaying) {
+          // Apply volume adjustment
+          final adjustedData = _applyVolume(audioData, _micVolume);
+          // Feed data to player
+          _player!.uint8ListSink?.add(adjustedData);
+        }
       });
 
       _micState = MicState.active;
@@ -160,20 +166,21 @@ class AudioService extends ChangeNotifier {
 
     try {
       // Stop recording
-      if (_recorder!.isRecording) {
+      if (_recorder != null && _recorder!.isRecording) {
         await _recorder!.stopRecorder();
       }
 
       // Stop playback
-      if (_player!.isPlaying) {
+      if (_player != null && _player!.isPlaying) {
         await _player!.stopPlayer();
       }
 
-      // Clean up stream
-      await _audioStreamSubscription?.cancel();
-      await _audioStreamController?.close();
-      _audioStreamController = null;
-      _audioStreamSubscription = null;
+      // Clean up streams
+      await _recorderSubscription?.cancel();
+      _recorderSubscription = null;
+
+      await _playerStreamController?.close();
+      _playerStreamController = null;
 
       // Release audio focus (allows other apps to resume full volume)
       await _audioSession?.setActive(false);
