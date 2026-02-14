@@ -67,12 +67,11 @@ class AudioService extends ChangeNotifier {
   }
 
   Future<void> _configureAudioSession() async {
-    await _audioSession?.configure(const AudioSessionConfiguration(
+    await _audioSession?.configure(AudioSessionConfiguration(
       avAudioSessionCategory: AVAudioSessionCategory.playAndRecord,
-      avAudioSessionCategoryOptions:
-          AVAudioSessionCategoryOptions.allowBluetooth |
-              AVAudioSessionCategoryOptions.defaultToSpeaker |
-              AVAudioSessionCategoryOptions.duckOthers,
+      avAudioSessionCategoryOptions: AVAudioSessionCategoryOptions.allowBluetooth
+          .union(AVAudioSessionCategoryOptions.defaultToSpeaker)
+          .union(AVAudioSessionCategoryOptions.duckOthers),
       avAudioSessionMode: AVAudioSessionMode.voiceChat,
       avAudioSessionRouteSharingPolicy:
           AVAudioSessionRouteSharingPolicy.defaultPolicy,
@@ -120,6 +119,7 @@ class AudioService extends ChangeNotifier {
         sampleRate: AppConstants.sampleRate,
         numChannels: AppConstants.numChannels,
         bufferSize: 8192,
+        interleaved: true,
       );
 
       // Create a stream controller for recorder output
